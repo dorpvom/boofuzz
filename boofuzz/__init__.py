@@ -6,10 +6,11 @@ import sys
 import six
 from past.builtins import map
 
-from . import blocks, exception, legos, pedrpc, primitives
+from . import blocks, exception, legos, primitives
 from .blocks import Block, Checksum, Repeat, Request, REQUESTS, Size
 from .connections import (
     BaseSocketConnection,
+    FileConnection,
     ip_constants,
     ISerialLike,
     ITargetConnection,
@@ -24,13 +25,14 @@ from .connections import (
 )
 from .constants import BIG_ENDIAN, DEFAULT_PROCMON_PORT, LITTLE_ENDIAN
 from .event_hook import EventHook
-from .exception import MustImplementException, SizerNotUtilizedError, SullyRuntimeError
+from .exception import MustImplementException, SizerNotUtilizedError, SullyRuntimeError, BoofuzzFailure
 from .fuzz_logger import FuzzLogger
 from .fuzz_logger_csv import FuzzLoggerCsv
 from .fuzz_logger_curses import FuzzLoggerCurses
 from .fuzz_logger_text import FuzzLoggerText
 from .ifuzz_logger import IFuzzLogger
 from .ifuzz_logger_backend import IFuzzLoggerBackend
+from .monitors import BaseMonitor, CallbackMonitor, NetworkMonitor, pedrpc, ProcessMonitor
 from .primitives import (
     BasePrimitive,
     BitField,
@@ -55,17 +57,21 @@ from .sessions import open_test_run, Session, Target
 if sys.platform == "win32" and sys.version_info >= (3, 8):
     import asyncio
 
-    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())
+    # noinspection PyUnresolvedReferences
+    asyncio.set_event_loop_policy(asyncio.WindowsSelectorEventLoopPolicy())  # pytype: disable=module-attr
 
 __all__ = [
+    "BaseMonitor",
     "BasePrimitive",
     "BaseSocketConnection",
     "BIG_ENDIAN",
     "BitField",
     "Block",
     "blocks",
+    "BoofuzzFailure",
     "Byte",
     "Bytes",
+    "CallbackMonitor",
     "Checksum",
     "CountRepeater",
     "DEFAULT_PROCMON_PORT",
@@ -73,6 +79,7 @@ __all__ = [
     "DWord",
     "EventHook",
     "exception",
+    "FileConnection",
     "FromFile",
     "FuzzLogger",
     "FuzzLoggerCsv",
@@ -88,9 +95,11 @@ __all__ = [
     "LITTLE_ENDIAN",
     "Mirror",
     "MustImplementException",
+    "NetworkMonitor",
     "open_test_run",
     "pedrpc",
     "primitives",
+    "ProcessMonitor",
     "QWord",
     "RandomData",
     "RawL2SocketConnection",
@@ -160,7 +169,7 @@ __all__ = [
     "Word",
 ]
 
-__version__ = "0.1.6"
+__version__ = "0.2.0"
 
 
 # REQUEST MANAGEMENT
@@ -177,7 +186,7 @@ def s_get(name=None):
     :type  name: str
     :param name: (Optional, def=None) Name of request to return or current request if name is None.
 
-    :rtype:  blocks.request
+    :rtype:  blocks.Request
     :return: The requested request.
     """
 
@@ -748,7 +757,7 @@ def s_byte(
 
 def s_bytes(value, size=None, padding=b"\x00", fuzzable=True, max_len=None, name=None):
     """
-    Push a bytes field onto the current block stack.
+    Push a bytes field of arbitrary length onto the current block stack.
 
     :type  value:        bytes
     :param value:        Default binary value

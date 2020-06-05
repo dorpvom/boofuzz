@@ -1,11 +1,13 @@
+import errno
 import pickle
 import select
 import socket
 import struct
 import sys
 import time
+import uuid
 
-from . import exception
+from boofuzz import exception
 
 
 class Client(object):
@@ -16,6 +18,7 @@ class Client(object):
         self.__server_sock = None
         self.__retry = 0
         self.NOLINGER = struct.pack("ii", 1, 0)
+        self.known_server = None
 
     def __getattr__(self, method_name):
         """
@@ -43,6 +46,7 @@ class Client(object):
 
         # connect to the server, timeout on failure.
         self.__server_sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+        self.__server_sock.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
         self.__server_sock.settimeout(3.0)
         try:
             self.__server_sock.connect((self.__host, self.__port))
@@ -98,12 +102,24 @@ class Client(object):
         if method_name == "__bool__":
             return 1
 
+        # subclasses run into this as they call a trampoline method...
+        # not sure if this is the right way to handle it, but it seems to work
+        if method_name.endswith("__method_missing"):
+            return self.__method_missing(*args, **kwargs)
+        elif method_name.endswith("__hot_transmit"):
+            return self.__hot_transmit(*args, **kwargs)
+
         # ignore all other attempts to access a private member.
         if method_name.startswith("__"):
             return
 
         # connect to the PED-RPC server.
         self.__connect()
+
+        server_uuid = self.__pickle_recv()
+        if server_uuid != self.known_server:
+            self.on_new_server(server_uuid)
+            self.known_server = server_uuid
 
         # transmit the method name and arguments.
         self.__pickle_send((method_name, (args, kwargs)))
@@ -114,6 +130,14 @@ class Client(object):
         # close the sock and return.
         self.__disconnect()
         return ret
+
+    def __hot_transmit(self, data):
+        self.__pickle_send(data)
+        self.__pickle_recv()
+        self.__disconnect()
+        self.__connect()
+        # Grab the instance id. assume it hasn't changed, otherwise we're doomed.
+        self.__pickle_recv()
 
     def __pickle_recv(self):
         """
@@ -130,7 +154,8 @@ class Client(object):
             # TODO: this should NEVER fail, but alas, it does and for the time being i can't figure out why.
             #       it gets worse. you would think that simply returning here would break things, but it doesn't.
             #       gotta track this down at some point.
-            length = struct.unpack("<L", self.__server_sock.recv(4))[0]
+            recvd = self.__server_sock.recv(4)
+            length = struct.unpack("<L", recvd)[0]
         except Exception:
             return
 
@@ -173,22 +198,51 @@ class Client(object):
                 '{0}:{1}. Error message: "{2}"\n'.format(self.__host, self.__port, e)
             )
 
+    def on_new_server(self, new_server):
+        """ Override this Method in a child class to be notified when the RPC server was restarted. """
+        return
+
 
 class Server(object):
+    """
+    The main PED-RPC Server class. To implement an RPC server, inherit from this class. Call ``serve_forever`` to start
+    listening for RPC commands.
+    """
+
     def __init__(self, host, port):
         self.__host = host
         self.__port = port
         self.__dbg_flag = False
         self.__client_sock = None
         self.__client_address = None
+        self.__running = True
+
+        # This is a bad solution for a problem that should not even exist in the first place.
+        # The Problem is that the client disconnects after each RPC call,
+        # and reconnects on the next without any way to know if the state
+        # of the RPC server has changed. This becomes a problem if e.g.
+        # a Virtual Machine with automatic restarting is used in conjunction
+        # with a Monitor that runs a RPC daemon on the target. In this case,
+        # a monitor may want to ensure that a set of options are in a known
+        # state on the target.
+        # For this to work, the client needs to know if the server has changed
+        # since the last time it connected to it so it can notify the implementation
+        # to re-send any initialisation code. This is implemented by the server
+        # generating a random uuid on startup and sending it to each new connection.
+        #
+        # In a perfect world, this protocol wouldn't reconnect for every command
+        # and options were associated with a connection, but at the moment I don't
+        # feel like cleaning up this mess.
+        self.__instance = uuid.uuid4()
 
         try:
             # create a socket and bind to the specified port.
             self.__server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+            self.__server.setsockopt(socket.SOL_SOCKET, socket.SO_REUSEADDR, 1)
             self.__server.settimeout(None)
             self.__server.bind((host, port))
             self.__server.listen(1)
-        except Exception:
+        except socket.error:
             sys.stderr.write("unable to bind to %s:%d\n" % (host, port))
             sys.exit(1)
 
@@ -199,8 +253,14 @@ class Server(object):
 
         if self.__client_sock is not None:
             self.__debug("closing client socket")
+            try:
+                self.__client_sock.shutdown(socket.SHUT_RDWR)
+            except socket.error as e:
+                if e.errno == errno.ENOTCONN:
+                    pass
+                else:
+                    raise
             self.__client_sock.close()
-            self.__client_sock = None
 
     def __debug(self, msg):
         if self.__dbg_flag:
@@ -256,12 +316,12 @@ class Server(object):
     def serve_forever(self):
         self.__debug("serving up a storm")
 
-        while 1:
+        while self.__running:
             # close any pre-existing socket.
             self.__disconnect()
 
             # accept a client connection.
-            while True:
+            while self.__running:
                 readable, writeable, errored = select.select([self.__server], [], [], 0.1)
                 if len(readable) > 0:
                     assert readable[0] == self.__server
@@ -270,7 +330,9 @@ class Server(object):
 
             self.__debug("accepted connection from %s:%d" % (self.__client_address[0], self.__client_address[1]))
 
-            # recieve the method name and arguments, continue on socket disconnect.
+            self.__pickle_send(self.__instance)
+
+            # receive the method name and arguments, continue on socket disconnect.
             try:
                 (method_name, (args, kwargs)) = self.__pickle_recv()
                 self.__debug("%s(args=%s, kwargs=%s)" % (method_name, args, kwargs))
@@ -284,9 +346,20 @@ class Server(object):
                 sys.stderr.write('PED-RPC> remote method "{0}" of {1} cannot be found\n'.format(method_name, self))
                 raise
             ret = method(*args, **kwargs)
-
             # transmit the return value to the client, continue on socket disconnect.
             try:
                 self.__pickle_send(ret)
             except Exception:
                 continue
+
+    def stop(self):
+        self.__running = False
+        self.__disconnect()
+        try:
+            self.__server.shutdown(socket.SHUT_RDWR)
+        except socket.error as e:
+            if e.errno == errno.ENOTCONN:
+                pass
+            else:
+                raise
+        self.__server.close()

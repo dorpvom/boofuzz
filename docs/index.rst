@@ -1,8 +1,8 @@
 boofuzz: Network Protocol Fuzzing for Humans
 ============================================
 
-.. image:: https://travis-ci.org/jtpereyda/boofuzz.svg?branch=master
-    :target: https://travis-ci.org/jtpereyda/boofuzz
+.. image:: https://github.com/jtpereyda/boofuzz/workflows/Test/badge.svg?branch=master
+    :target: https://github.com/jtpereyda/boofuzz/actions?query=workflow%3ATest+branch%3Amaster
 .. image:: https://readthedocs.org/projects/boofuzz/badge/?version=latest
     :target: https://boofuzz.readthedocs.io/
     :alt: Documentation Status
@@ -48,7 +48,7 @@ Sulley is affectionately named after the giant teal and purple creature
 from Monsters Inc. due to his fuzziness. Boofuzz is likewise named after
 the only creature known to have scared Sulley himself: Boo!
 
-.. figure:: _static/boo.png
+.. figure:: https://github.com/jtpereyda/boofuzz/raw/master/_static/boo.png
    :alt: Boo from Monsters Inc
 
    Boo from Monsters Inc
@@ -57,15 +57,11 @@ Installation
 ------------
 ::
 
-    pip install boofuzz --user
+    pip install boofuzz
 
 
 Boofuzz installs as a Python library used to build fuzzer scripts. See
 :ref:`install` for advanced and detailed instructions.
-
-
-User Guide
-----------
 
 
 .. toctree::
@@ -88,9 +84,6 @@ coverage:
 
 If you have an open source boofuzz protocol suite to share, please :ref:`let us know <community>`!
 
-API Documentation
------------------
-
 .. toctree::
     :caption: API Documentation
     :maxdepth: 2
@@ -98,6 +91,7 @@ API Documentation
     source/Session
     source/Target
     user/connections
+    user/monitors
     user/logging
     user/static-protocol-definition
     user/other-modules
@@ -138,7 +132,7 @@ For updates, follow `@b00fuzz`_ on Twitter.
 
 
 Indices and tables
-==================
+------------------
 
 * :ref:`genindex`
 * :ref:`modindex`

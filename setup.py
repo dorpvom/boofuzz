@@ -33,8 +33,11 @@ def get_long_description():
 
 
 extra_requirements = {
-    "dev": ["tox", "flake8", "check-manifest", "mock", "pytest", "pytest-bdd", "netifaces", "ipaddress", "sphinx"]
+    "dev": ["tox", "flake8", "check-manifest", "mock", "pytest", "pytest-bdd", "pytest-cov", "netifaces", "ipaddress"],
+    "docs": ["sphinx", "sphinx_rtd_theme", "pygments>=2.4.0"],
 }
+extra_requirements["dev"] += extra_requirements["docs"]
+
 if sys.version_info >= (3, 6):
     extra_requirements["dev"] += ["black"]
 
@@ -48,19 +51,16 @@ setup(
     maintainer="Joshua Pereyda",
     maintainer_email="joshua.t.pereyda@gmail.com",
     url="https://github.com/jtpereyda/boofuzz",
-    license="GPL",
-    packages=find_packages(exclude=["unit_tests", "requests", "examples", "utils", "web", "new_examples"]),
-    package_data={"boofuzz": ["web/templates/*", "web/static/css/*", "web/static/js/*", "web/static/favicon.ico"]},
+    packages=find_packages(exclude=["docs", "examples", "request_definitions", "unit_tests", "utils"]),
+    package_data={"boofuzz.web": ["static/*", "static/*/*", "templates/*", "templates/*/*"]},
     install_requires=[
         "attrs",
         "backports.shutil_get_terminal_size",
         "click",
         "colorama",
-        "crc32c",
         "Flask",
         "future",
         "impacket",
-        "ldap3==2.5.1",
         "psutil",
         "pyserial",
         "pydot",
@@ -81,8 +81,14 @@ setup(
         "Operating System :: OS Independent",
         "Programming Language :: Python",
         "Programming Language :: Python :: 2",
+        "Programming Language :: Python :: 2.7",
         "Programming Language :: Python :: 3",
+        "Programming Language :: Python :: 3.5",
+        "Programming Language :: Python :: 3.6",
+        "Programming Language :: Python :: 3.7",
+        "Programming Language :: Python :: 3.8",
         "Topic :: Security",
+        "Topic :: System :: Networking",
         "Topic :: Software Development :: Testing :: Traffic Generation",
     ],
 )

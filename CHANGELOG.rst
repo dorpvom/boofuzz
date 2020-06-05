@@ -1,22 +1,42 @@
 Changelog
 =========
 
-Upcoming
---------
+v0.2.0
+------
 Features
 ^^^^^^^^
 - Rewrote and split the SocketConnection class into individual classes per socket type.
 - `SocketConnection` is now deprecated. Use the classes derived from `BaseSocketConnection` instead.
-- Added support for receiving on raw Layer 2 and Layer 3 connections
-- Layer 2 and Layer 3 connections may now use arbitrary payload / MTU sizes
-- Moved connection related modules into new `connections` subpacket
+- Added support for receiving on raw Layer 2 and Layer 3 connections.
+- Layer 2 and Layer 3 connections may now use arbitrary payload / MTU sizes.
+- Moved connection related modules into new `connections` submodule.
 - Added the ability to repeat sending of packages within a given time or count.
+- Added optional timeout and threshold to quit infinite connection retries.
+- Reworked Monitors, consolidated interface. Breaking change: session no longer has netmon_options and procmon_options.
+- `SessionInfo` has had attributes renamed; procmon_results and netmon_results are deprecated and now aliases for monitor_results and monitor_data respectively.
+- New `BoofuzzFailure` exception type allows callback methods to signal a failure that should halt the current test case.
+- Added `capture_output` option to process monitor to capture target process stderr/stdout .
+- Added post-start-target callbacks (called every time a target is started or restarted).
+- Added method to gracefully stop PED-RPC Server.
+- Added new boofuzz logo and favicon to docs and webinterface.
+- Added `FileConnection` to dump messages to files.
+- Removed deprecated session arguments `fuzz_data_logger`, `log_level`, `logfile`, `logfile_level` and `log()`.
+- Removed deprecated logger `FuzzLoggerFile`.
+- `crc32c` is no longer a required package. Install manually if needed.
 
 Fixes
 ^^^^^
+- Fixed size of s_size block when output is ascii.
 - Fixed issue with tornado on Python 3.8 and Windows.
-- Fixed various potential type errors
-- Renamed `requests` folder to `request_definitions` because it shadowed the name of the `requests` python module
+- Fixed various potential type errors.
+- Renamed `requests` folder to `request_definitions` because it shadowed the name of the `requests` python module.
+- Examples are up to date with current Boofuzz version.
+- Modified timings on serial_connection unit tests to improve test reliability.
+- Refactored old unit-tests.
+- Fixed network monitor compatibility with Python 3.
+- Minor console GUI optimizations.
+- Fixed crash_threshold_element handling if blocks are used.
+- Fixed many bugs in which a failure would not stop the test case evaluation.
 
 v0.1.6
 ------
@@ -234,7 +254,7 @@ Features
 ^^^^^^^^
 -  ``s_size`` is now fuzzable by default.
 -  Add new s_fuzz_list primitive to read fuzz value from files.
--  Add new FuzzLoggerCsv to write log in CSV format 
+-  Add new FuzzLoggerCsv to write log in CSV format
 
 Fixes
 ^^^^^

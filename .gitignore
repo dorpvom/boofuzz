@@ -55,5 +55,11 @@ docs/_build/
 .idea/
 
 # Misc
+.fuzz_ints
+.fuzz_strings
 archived_fuzzies/*.session
 boofuzz-results/
+
+# Temporary Files
+*.swp
+.DS_Store

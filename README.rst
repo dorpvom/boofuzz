@@ -1,8 +1,12 @@
+.. image:: https://github.com/jtpereyda/boofuzz/raw/master/artwork/boo-logo-dark.svg
+    :width: 60%
+    :alt: boofuzz logo
+
 boofuzz: Network Protocol Fuzzing for Humans
 ============================================
 
-.. image:: https://travis-ci.org/jtpereyda/boofuzz.svg?branch=master
-    :target: https://travis-ci.org/jtpereyda/boofuzz
+.. image:: https://github.com/jtpereyda/boofuzz/workflows/Test/badge.svg?branch=master
+    :target: https://github.com/jtpereyda/boofuzz/actions?query=workflow%3ATest+branch%3Amaster
 .. image:: https://readthedocs.org/projects/boofuzz/badge/?version=latest
     :target: https://boofuzz.readthedocs.io/
     :alt: Documentation Status
@@ -61,7 +65,7 @@ Installation
 ------------
 ::
 
-    pip install boofuzz --user
+    pip install boofuzz
 
 
 Boofuzz installs as a Python library used to build fuzzer scripts. See

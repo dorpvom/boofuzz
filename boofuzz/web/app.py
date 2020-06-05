@@ -1,8 +1,7 @@
 import re
-import os
 
 import flask
-from flask import Flask, redirect, render_template, send_from_directory
+from flask import Flask, redirect, render_template
 
 from .. import exception
 
@@ -19,13 +18,6 @@ def commify(number):
     while processing:
         (number, processing) = regex.subn(r"\1,\2", number)
     return number
-
-
-@app.route("/favicon.ico")
-def favicon():
-    return send_from_directory(
-        os.path.join(app.root_path, "static"), "favicon.ico", mimetype="image/vnd.microsoft.icon"
-    )
 
 
 @app.route("/togglepause")
@@ -149,13 +141,13 @@ def index():
 
 def _crash_summary_info():
     crashes = []
-    procmon_result_keys = list(app.session.procmon_results)
+    procmon_result_keys = list(app.session.monitor_results)
     procmon_result_keys.sort()
     for key in procmon_result_keys:
-        val = app.session.procmon_results[key]
+        val = app.session.monitor_results[key]
         status_bytes = "&nbsp;"
 
-        if key in app.session.netmon_results:
+        if key in app.session.monitor_data:
             status_bytes = commify(app.session.netmon_results[key])
 
         crash = {"key": key, "reasons": val, "status_bytes": status_bytes}
