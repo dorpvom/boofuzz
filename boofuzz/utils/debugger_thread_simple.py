@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import json
 import os
 
 try:
@@ -68,6 +69,7 @@ class DebuggerThreadSimple(threading.Thread):
         coredump_dir=None,
         log_level=1,
         capture_output=False,
+        crash_format=None,
         **kwargs
     ):
         threading.Thread.__init__(self)
@@ -88,6 +90,7 @@ class DebuggerThreadSimple(threading.Thread):
         self.exit_status = None
         self.log_level = log_level
         self._process = None
+        self.crash_format = crash_format if crash_format else "simple"
 
     def log(self, msg="", level=1):
         """
@@ -179,14 +182,35 @@ class DebuggerThreadSimple(threading.Thread):
                 msg="Expired waiting for process {0} to terminate".format(self._process.pid), level=1
             )
 
-        msg = "[{0}] Crash. Exit code: {1}. Reason - {2}\n".format(
-            time.strftime("%I:%M.%S"), self.exit_status if self.exit_status is not None else "<unknown>", reason
+        if self.crash_format == "json":
+            self.process_monitor.last_synopsis = self._json_synopsis(errdata, outdata, reason)
+        else:
+            self.process_monitor.last_synopsis = self._simple_synopsis(errdata, outdata, reason)
+
+    def _json_synopsis(self, errdata, outdata, reason):
+        return json.dumps(
+            {
+                "boofuzz_status": "[{0}] Crash. Exit code: {1}. Reason - {2}\n".format(
+                    time.strftime("%I:%M.%S"),
+                    self.exit_status if self.exit_status is not None else "<unknown>",
+                    reason
+                ),
+                "stderr": "{0}\n".format(errdata.decode("ascii")) if errdata else None,
+                "stdout": "{0}\n".format(outdata.decode("ascii")) if outdata else None
+            }
+        )
+
+    def _simple_synopsis(self, errdata, outdata, reason):
+        message = "[{0}] Crash. Exit code: {1}. Reason - {2}\n".format(
+            time.strftime("%I:%M.%S"),
+            self.exit_status if self.exit_status is not None else "<unknown>",
+            reason
         )
         if errdata is not None:
-            msg += "STDERR:\n{0}\n".format(errdata.decode("ascii"))
+            message += "STDERR:\n{0}\n".format(errdata.decode("ascii"))
         if outdata is not None:
-            msg += "STDOUT:\n{0}\n".format(outdata.decode("ascii"))
-        self.process_monitor.last_synopsis = msg
+            message += "STDOUT:\n{0}\n".format(outdata.decode("ascii"))
+        return message
 
     def watch(self):
         """
@@ -227,7 +251,8 @@ class DebuggerThreadSimple(threading.Thread):
             return True
         else:
             with open(self.process_monitor.crash_filename, "a") as rec_file:
-                rec_file.write(self.process_monitor.last_synopsis)
+                synopsis = self.process_monitor.last_synopsis
+                rec_file.write("{}, ".format(synopsis) if self.crash_format == 'json' else synopsis)
 
             if self.process_monitor.coredump_dir is not None:
                 dest = os.path.join(self.process_monitor.coredump_dir, str(self.process_monitor.test_number))
