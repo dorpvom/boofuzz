@@ -39,7 +39,8 @@ def _split_command_if_str(command):
 
 class ProcessMonitorPedrpcServer(pedrpc.Server):
     def __init__(
-        self, host, port, crash_filename, debugger_class, proc_name=None, pid_to_ignore=None, level=1, coredump_dir=None
+        self, host, port, crash_filename, debugger_class, proc_name=None, pid_to_ignore=None, level=1,
+        coredump_dir=None, crash_format_json=False
     ):
         """
         @type  host:           str
@@ -71,7 +72,7 @@ class ProcessMonitorPedrpcServer(pedrpc.Server):
         self.test_number = None
         self.debugger_thread = None
         self.crash_bin = utils.crash_binning.CrashBinning()
-        self.crash_format = CrashFormats.SIMPLE
+        self.crash_format = CrashFormats.JSON if crash_format_json else CrashFormats.SIMPLE
 
         self.last_synopsis = ""
 
