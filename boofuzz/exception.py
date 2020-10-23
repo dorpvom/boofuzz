@@ -70,3 +70,7 @@ class BoofuzzSSLError(BoofuzzError):
 
 class BoofuzzNameResolutionError(BoofuzzError):
     pass
+
+
+class BoofuzzBrokenPrepNodeError(BoofuzzError):
+    pass

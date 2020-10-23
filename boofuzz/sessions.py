@@ -1514,6 +1514,16 @@ class Session(pgraph.Graph):
                 self._fuzz_data_logger.open_test_step("Sleep between tests.")
                 self._fuzz_data_logger.log_info("sleeping for %f seconds" % self.sleep_time)
                 time.sleep(self.sleep_time)
+        except exception.BoofuzzBrokenPrepNodeError:
+            self._fuzz_data_logger.log_info("Dropping test case due to broken transmission of prep node")
+            self._check_for_passively_detected_failures(target)
+            if not self._reuse_target_connection:
+                target.close()
+
+            if self.sleep_time > 0:
+                self._fuzz_data_logger.open_test_step("Sleep between tests.")
+                self._fuzz_data_logger.log_info("sleeping for %f seconds" % self.sleep_time)
+                time.sleep(self.sleep_time)
         finally:
             if self._process_failures(target=target):
                 print("FAIL: {0}".format(test_case_name))
@@ -1597,6 +1607,15 @@ class Session(pgraph.Graph):
         except BoofuzzFailure as e:
             self._fuzz_data_logger.log_fail(e.message)
             self._check_for_passively_detected_failures(target=target, failure_already_detected=True)
+        except exception.BoofuzzBrokenPrepNodeError:
+            self._fuzz_data_logger.log_info("Dropping test case due to broken transmission of prep node")
+            self._check_for_passively_detected_failures(target=target)
+            if not self._reuse_target_connection:
+                target.close()
+
+            if self.sleep_time > 0:
+                self._fuzz_data_logger.open_test_step("Sleep between tests.")
+                self._sleep(self.sleep_time)
         finally:
             self._process_failures(target=target)
             self._fuzz_data_logger.close_test_case()
