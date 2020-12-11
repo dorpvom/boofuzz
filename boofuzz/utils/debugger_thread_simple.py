@@ -210,9 +210,15 @@ class DebuggerThreadSimple(threading.Thread):
 
     def stop_target(self):
         try:
+            self._stop_children(psutil.Process(pid=self.pid))
             os.kill(self.pid, signal.SIGKILL)
         except OSError as e:
             print(e.errno)  # TODO interpret some basic errors
+
+    def _stop_children(self, process):
+        for child in process.children():
+            self._stop_children(child)
+            child.kill()
 
     def pre_send(self):
         pass
