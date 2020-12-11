@@ -43,7 +43,7 @@ def err(msg):
     sys.stderr.write("ERR> " + msg + "\n") or sys.exit(1)
 
 
-def serve_procmon(port, crash_bin, proc_name, ignore_pid, log_level, coredump_dir):
+def serve_procmon(port, crash_bin, proc_name, ignore_pid, log_level, coredump_dir, json):
     with ProcessMonitorPedrpcServer(
         host="0.0.0.0",
         port=port,
@@ -53,6 +53,7 @@ def serve_procmon(port, crash_bin, proc_name, ignore_pid, log_level, coredump_di
         pid_to_ignore=ignore_pid,
         level=log_level,
         coredump_dir=coredump_dir,
+        crash_format_json=json
     ) as servlet:
         servlet.serve_forever()
 
@@ -92,7 +93,8 @@ def serve_procmon(port, crash_bin, proc_name, ignore_pid, log_level, coredump_di
     help="directory where coredumps are moved to (you may need to adjust ulimits to create coredumps)",
     default="coredumps",
 )
-def go(crash_bin, ignore_pid, log_level, proc_name, port, coredump_dir):
+@click.option("--json", "-J", help="Store crash log as json", is_flag=True)
+def go(crash_bin, ignore_pid, log_level, proc_name, port, coredump_dir, json):
     if coredump_dir is not None:
         helpers.mkdir_safe(coredump_dir)
 
@@ -103,6 +105,7 @@ def go(crash_bin, ignore_pid, log_level, proc_name, port, coredump_dir):
         ignore_pid=ignore_pid,
         log_level=log_level,
         coredump_dir=coredump_dir,
+        json=json
     )
 
 

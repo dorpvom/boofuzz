@@ -11,6 +11,12 @@ from past.builtins import map
 from boofuzz import pedrpc, utils
 
 
+class CrashFormats:
+    ALL = ["simple", "json"]
+    SIMPLE = "simple"
+    JSON = "json"
+
+
 def _split_command_if_str(command):
     """Splits a shell command string into a list of arguments.
 
@@ -34,7 +40,8 @@ def _split_command_if_str(command):
 
 class ProcessMonitorPedrpcServer(pedrpc.Server):
     def __init__(
-        self, host, port, crash_filename, debugger_class, proc_name=None, pid_to_ignore=None, level=1, coredump_dir=None
+        self, host, port, crash_filename, debugger_class, proc_name=None, pid_to_ignore=None, level=1,
+        coredump_dir=None, crash_format_json=False
     ):
         """
         @type  host:           str
@@ -66,6 +73,7 @@ class ProcessMonitorPedrpcServer(pedrpc.Server):
         self.test_number = None
         self.debugger_thread = None
         self.crash_bin = utils.crash_binning.CrashBinning()
+        self.crash_format = CrashFormats.JSON if crash_format_json else CrashFormats.SIMPLE
 
         self.last_synopsis = ""
 
@@ -165,6 +173,7 @@ class ProcessMonitorPedrpcServer(pedrpc.Server):
             log_level=self.log_level,
             coredump_dir=self.coredump_dir,
             capture_output=self.capture_output,
+            crash_format=self.crash_format
         )
         self.debugger_thread.daemon = True
         self.debugger_thread.start()
@@ -245,3 +254,10 @@ class ProcessMonitorPedrpcServer(pedrpc.Server):
     def set_crash_filename(self, new_crash_filename):
         self.log("updating crash bin filename to '%s'" % new_crash_filename)
         self.crash_filename = new_crash_filename
+
+    def set_crash_format(self, crash_format):
+        if crash_format not in CrashFormats.ALL:
+            self.log("not updating crash format. Unknown format '%s'" % crash_format)
+            return
+        self.log("updating crash format to '%s'" % crash_format)
+        self.crash_format = crash_format

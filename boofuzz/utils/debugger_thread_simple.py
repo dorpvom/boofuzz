@@ -1,5 +1,6 @@
 from __future__ import print_function
 
+import json
 import os
 
 try:
@@ -68,6 +69,7 @@ class DebuggerThreadSimple(threading.Thread):
         coredump_dir=None,
         log_level=1,
         capture_output=False,
+        crash_format=None,
         **kwargs
     ):
         threading.Thread.__init__(self)
@@ -88,6 +90,7 @@ class DebuggerThreadSimple(threading.Thread):
         self.exit_status = None
         self.log_level = log_level
         self._process = None
+        self.crash_format = crash_format if crash_format else "simple"
 
     def log(self, msg="", level=1):
         """
@@ -140,11 +143,6 @@ class DebuggerThreadSimple(threading.Thread):
         self.process_monitor.log("attached to pid: {0}".format(self.pid))
 
     def run(self):
-        """
-        self.exit_status = os.waitpid(self.pid, os.WNOHANG | os.WUNTRACED)
-        while self.exit_status == (0, 0):
-            self.exit_status = os.waitpid(self.pid, os.WNOHANG | os.WUNTRACED)
-        """
         self.spawn_target()
 
         self.finished_starting.set()
@@ -155,39 +153,54 @@ class DebuggerThreadSimple(threading.Thread):
             exit_info = os.waitpid(self.pid, 0)
             self.exit_status = exit_info[1]  # [0] is the pid
 
-        default_reason = "Process died for unknown reason"
+        reason = "Process died for unknown reason"
         if self.exit_status is not None:
             if os.WCOREDUMP(self.exit_status):
                 reason = "Segmentation fault"
             elif os.WIFSTOPPED(self.exit_status):
-                reason = "Stopped with signal " + str(os.WTERMSIG(self.exit_status))
+                reason = "Stopped with signal {0}".format(os.WTERMSIG(self.exit_status))
             elif os.WIFSIGNALED(self.exit_status):
-                reason = "Terminated with signal " + str(os.WTERMSIG(self.exit_status))
+                reason = "Terminated with signal {0}".format(os.WTERMSIG(self.exit_status))
             elif os.WIFEXITED(self.exit_status):
-                reason = "Exit with code - " + str(os.WEXITSTATUS(self.exit_status))
-            else:
-                reason = default_reason
-        else:
-            reason = default_reason
+                reason = "Exit with code - {0}".format(os.WEXITSTATUS(self.exit_status))
 
-        outdata = None
-        errdata = None
-        try:
-            if self._process is not None:
-                outdata, errdata = self._process.communicate(timeout=POPEN_COMMUNICATE_TIMEOUT_FOR_ALREADY_DEAD_TASK)
-        except subprocess.TimeoutExpired:
-            self.process_monitor.log(
-                msg="Expired waiting for process {0} to terminate".format(self._process.pid), level=1
-            )
+        if self._process is not None:
+            try:
+                stdout, stderr = self._process.communicate(timeout=POPEN_COMMUNICATE_TIMEOUT_FOR_ALREADY_DEAD_TASK)
 
-        msg = "[{0}] Crash. Exit code: {1}. Reason - {2}\n".format(
-            time.strftime("%I:%M.%S"), self.exit_status if self.exit_status is not None else "<unknown>", reason
+                if self.crash_format == "json":
+                    self.process_monitor.last_synopsis = self._json_synopsis(stderr, stdout, reason)
+                else:
+                    self.process_monitor.last_synopsis = self._simple_synopsis(stderr, stdout, reason)
+            except subprocess.TimeoutExpired:
+                self.process_monitor.log(
+                    msg="Expired waiting for process {0} to terminate".format(self._process.pid), level=1
+                )
+
+    def _json_synopsis(self, stderr, stdout, reason):
+        return json.dumps(
+            {
+                "boofuzz_status": "[{0}] Crash. Exit code: {1}. Reason - {2}\n".format(
+                    time.strftime("%I:%M.%S"),
+                    self.exit_status if self.exit_status is not None else "<unknown>",
+                    reason
+                ),
+                "stderr": "{0}\n".format(stderr.decode("ascii")) if stderr else None,
+                "stdout": "{0}\n".format(stdout.decode("ascii")) if stdout else None
+            }
         )
-        if errdata is not None:
-            msg += "STDERR:\n{0}\n".format(errdata.decode("ascii"))
-        if outdata is not None:
-            msg += "STDOUT:\n{0}\n".format(outdata.decode("ascii"))
-        self.process_monitor.last_synopsis = msg
+
+    def _simple_synopsis(self, stderr, stdout, reason):
+        message = "[{0}] Crash. Exit code: {1}. Reason - {2}\n".format(
+            time.strftime("%I:%M.%S"),
+            self.exit_status if self.exit_status is not None else "<unknown>",
+            reason
+        )
+        if stderr is not None:
+            message += "STDERR:\n{0}\n".format(stderr.decode("ascii"))
+        if stdout is not None:
+            message += "STDOUT:\n{0}\n".format(stdout.decode("ascii"))
+        return message
 
     def watch(self):
         """
@@ -234,7 +247,8 @@ class DebuggerThreadSimple(threading.Thread):
             return True
         else:
             with open(self.process_monitor.crash_filename, "a") as rec_file:
-                rec_file.write(self.process_monitor.last_synopsis)
+                synopsis = self.process_monitor.last_synopsis
+                rec_file.write("{}, ".format(synopsis) if self.crash_format == 'json' else synopsis)
 
             if self.process_monitor.coredump_dir is not None:
                 dest = os.path.join(self.process_monitor.coredump_dir, str(self.process_monitor.test_number))
